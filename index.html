@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>اختبار الخلية</title>
+<style>
+body{font-family:Tahoma,Arial,sans-serif;background:#eef3ee;margin:0;display:flex;justify-content:center}
+#box{width:min(720px,95vw);margin:24px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:10px 16px}
+.tool{background:#2e6b3f;color:#fff}.tool.off{background:#999}
+#q{background:#fff;border-radius:14px;padding:22px;font-size:1.3em;line-height:1.7;margin-bottom:14px;box-shadow:0 2px 6px #0002}
+.ans{display:block;width:100%;text-align:right;background:#fff;border:2px solid #cfd9cf;margin-bottom:10px;padding:14px;font-size:1.1em}
+.ans:hover:not(:disabled){border-color:#2e6b3f}
+.ans.ok{background:#c9f0d2;border-color:#1f8a3b}.ans.bad{background:#f8cccc;border-color:#c0392b}
+#bar{height:8px;background:#d5ddd5;border-radius:5px;overflow:hidden}#fill{height:100%;background:#2e6b3f;width:0}
+#jump{width:56px;padding:8px 6px;border:2px solid #cfd9cf;border-radius:10px;font:inherit;text-align:center}
+.idk{background:#f0e3b8;color:#333;margin-top:2px}
+.nav{display:flex;justify-content:space-between;margin-top:6px}.tool:disabled{background:#bbb;cursor:not-allowed}
+.msg{background:#fff;border-radius:14px;padding:30px;text-align:center;font-size:1.2em}
+</style></head><body><div id="box">
+<div class="top"><b id="info"></b><span><input id="jump" type="number" min="1" title="اكتب رقم السؤال ثم Enter" placeholder="رقم"> <button class="tool" id="wbtn" style="display:none;background:#c0392b"></button> <button class="tool" id="rnd">🎲 ترتيب عشوائي</button> <button class="tool" id="rst">↻ من البداية</button></span></div>
+<div id="bar"><div id="fill"></div></div><br>
+<div id="main"></div></div>
+<script src="questions.js"></script>
+<script>
+let order=[],main=[],mi=0,rv=[],ri=0,rev=false,done=false,random=false,wrong=new Set();
+const $=id=>document.getElementById(id);
+const shuffle=a=>{for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]]}return a};
+const mk=k=>({k,opts:shuffle([[Q[k][1],true],[Q[k][2],false],[Q[k][3],false]]),pick:null});
+const arr=()=>rev?rv:main, pos=()=>rev?ri:mi, setPos=n=>{if(rev)ri=n;else mi=n;};
+function start(r){random=r;order=Q.map((_,k)=>k);if(r)shuffle(order);main=order.map(mk);mi=0;rv=[];ri=0;rev=false;done=false;wrong.clear();
+  $('rnd').classList.toggle('off',!r);show();}
+function show(){
+  const w=$('wbtn');w.style.display=wrong.size?'':'none';w.textContent=rev?'↩ رجوع للأسئلة':'❌ الأخطاء ('+wrong.size+')';
+  const m=$('main');
+  if(done){m.innerHTML='<div class="msg">🎉 أحسنت! أجبت عن كل الأسئلة بشكل صحيح.</div>';$('fill').style.width='100%';$('info').textContent='انتهى';return;}
+  const A=arr(),p=pos(),s=A[p],q=Q[s.k];
+  $('info').textContent=(rev?'مراجعة الأخطاء (المتبقي '+wrong.size+') — ':'')+'سؤال '+(p+1)+' من '+A.length;
+  $('fill').style.width=((p+1)/A.length*100)+'%';
+  $('jump').value=p+1;$('jump').max=A.length;
+  m.innerHTML='<div id="q"></div>';$('q').textContent=q[0];
+  s.opts.forEach(([t,ok])=>{
+    const b=document.createElement('button');b.className='ans';b.textContent=t;
+    if(s.pick!==null){b.disabled=true;if(ok)b.classList.add('ok');else if(t===s.pick)b.classList.add('bad');}
+    else b.onclick=()=>answer(t);
+    m.appendChild(b);});
+  if(s.pick===null){const d=document.createElement('button');d.className='ans idk';d.textContent='🤷 لا أعرف';d.onclick=()=>answer('__idk');m.appendChild(d);}
+  const nav=document.createElement('div');nav.className='nav';
+  const pv=document.createElement('button');pv.className='tool';pv.textContent='◀ السابق';pv.disabled=p===0;pv.onclick=()=>{setPos(p-1);show();};
+  nav.append(pv);m.appendChild(nav);
+}
+function answer(t){
+  const s=arr()[pos()];s.pick=t;
+  if(t===Q[s.k][1]){if(rev)wrong.delete(s.k);}else wrong.add(s.k);
+  show();
+  const ok=t===Q[s.k][1];
+  setTimeout(()=>{if(!done&&arr()[pos()]===s)next();},ok?700:1800);   // انتقال تلقائي
+}
+function enterReview(){rv=[...wrong].map(mk);ri=0;rev=true;show();}
+function next(){
+  const A=arr(),p=pos();
+  if(p<A.length-1){setPos(p+1);show();return;}
+  if(!rev){if(wrong.size)enterReview();else{done=true;show();}return;}
+  if(wrong.size){enterReview();return;}           // ما زال هناك أخطاء: جولة مراجعة جديدة
+  rev=false;                                        // انتهت الأخطاء: نعود حيث كنا
+  if(main.every(x=>x.pick!==null))done=true;
+  show();
+}
+function jump(){const n=parseInt($('jump').value);if(!done&&n>=1&&n<=arr().length){setPos(n-1);show();}else if(!done)$('jump').value=pos()+1;}
+$('jump').onkeydown=e=>{if(e.key==='Enter')jump();};
+$('jump').onchange=jump;
+$('wbtn').onclick=()=>{if(rev){rev=false;show();}else if(wrong.size)enterReview();};
+$('rnd').onclick=()=>start(!random);
+$('rst').onclick=()=>start(random);
+start(false);
+</script></body></html>
